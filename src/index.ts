@@ -85,13 +85,8 @@ async function signRawTransaction() {
     type: 'eip4844',
   });
 
-  const signableTransaction = {
-    ...request,
-    sidecars: false as false, // see: https://github.com/wevm/viem/blob/73a677c1f5138ac343bfe8b869f39829c7d6eeba/src/accounts/utils/signTransaction.ts#L53-L62
-  };
-
   // Sign the transaction
-  const serializedTx = await account.signTransaction(signableTransaction);
+  const serializedTx = await account.signTransaction(request);
 
   const txHash = await client.sendRawTransaction({
     serializedTransaction: serializedTx,
@@ -167,4 +162,4 @@ async function signTransaction() {
   console.log(`Transaction sent: https://sepolia.blobscan.com/tx/${txHash}`);
 }
 
-signTransaction();
+signRawTransaction();
