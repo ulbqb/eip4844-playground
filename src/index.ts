@@ -7,6 +7,7 @@ import {
   hexToBytes,
   http,
   parseGwei,
+  sha256,
   stringToHex,
   toBlobs,
 } from 'viem';
@@ -162,4 +163,76 @@ async function signTransaction() {
   console.log(`Transaction sent: https://sepolia.blobscan.com/tx/${txHash}`);
 }
 
-signRawTransaction();
+async function KZGProofVerification() {
+  const kzg = await loadKZG();
+
+  const blobs = toBlobs({
+    data: stringToHex('hello world'),
+  });
+
+  // get blob data
+  const blobData = blobs[0];
+  // get kzg commitment
+  const kzgCommitment = kzg.blobToKZGCommitment(blobData);
+  // get kzg proof
+  const kzgProof = kzg.computeBlobKZGProof(blobData, kzgCommitment);
+  // validate blob existence using proof
+  const isValid = kzg.verifyBlobKZGProof(blobData, kzgCommitment, kzgProof);
+
+  console.log(`Blob existence validated: ${isValid}`);
+}
+
+async function makeBlobVersionedHashes() {
+  const kzg = await loadKZG();
+  const blobs = toBlobs({ data: stringToHex('hello world') });
+  const blobVersionedHashes = blobs.map((blob) =>
+    kzg.blobToKZGCommitment(blob)
+  );
+
+  const versioned_hash = sha256(blobVersionedHashes[0] as `0x${string}`);
+
+  const account = privateKeyToAccount(PRIVATE_KEY);
+  const client = createWalletClient({
+    account,
+    chain: sepolia,
+    transport: http(),
+  });
+  // These adaptations are required in order to use `kzg-wasm`, in order for types to resolve.
+  // Why `kzg-wasm` over `c-kzg`? No particular reason, but makes builds simpler in certain environments.
+  const blobToKzgCommitmentAdapter = (blob: ByteArray): ByteArray => {
+    const hexInput = bytesToHex(blob);
+    const commitmentHex = kzg.blobToKZGCommitment(hexInput);
+    return hexToBytes(commitmentHex as `0x${string}`);
+  };
+
+  const computeBlobKzgProofAdapter = (
+    blob: ByteArray,
+    commitment: ByteArray
+  ): ByteArray => {
+    const hexBlob = bytesToHex(blob);
+    const hexCommitment = bytesToHex(commitment);
+    const proofHex = kzg.computeBlobKZGProof(hexBlob, hexCommitment);
+    return hexToBytes(proofHex as `0x${string}`);
+  };
+
+  const adaptedKzg = {
+    ...kzg,
+    computeBlobKzgProof: computeBlobKzgProofAdapter,
+    blobToKzgCommitment: blobToKzgCommitmentAdapter,
+  };
+
+  // Prepare the transaction first
+  const request = await client.prepareTransactionRequest({
+    account: account,
+    blobs,
+    kzg: adaptedKzg,
+    maxFeePerBlobGas: parseGwei('30'),
+    to: '0x0000000000000000000000000000000000000000',
+    type: 'eip4844',
+  });
+
+  console.log(request.blobVersionedHashes[0]);
+  console.log(versioned_hash);
+}
+
+KZGProofVerification();
