@@ -104,6 +104,7 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
       console.log(
         `transaction result: https://sepolia.etherscan.io/tx/${txHash}`
       );
+      await timeout(5000); // wait for 5 seconds
       const transaction = await publicClient.getTransaction({
         hash: txHash,
       });
@@ -305,4 +306,8 @@ function bigintReplacer(_key: string, value: any) {
 
 function equalHex(a: Hex, b: Hex) {
   return a.toLowerCase() === b.toLowerCase();
+}
+
+async function timeout(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
