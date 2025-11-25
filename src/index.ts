@@ -102,7 +102,7 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
         serializedTransaction: serializedTx,
       });
       console.log(
-        `transaction result: https://sepolia.etherscan.io/tx/${txHash}`
+        `transaction result: https://sepolia.blobscan.com/tx/${txHash}`
       );
       await timeout(5000); // wait for 5 seconds
       const transaction = await publicClient.getTransaction({
