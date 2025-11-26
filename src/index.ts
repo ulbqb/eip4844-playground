@@ -34,6 +34,28 @@ const mainnetTrustedSetupPath = resolve(
   './node_modules/viem/trusted-setups/mainnet.json'
 );
 
+// const fusakaDevnet = defineChain({
+//   id: 7023102237,
+//   name: 'Fusaka Devnet',
+//   nativeCurrency: {
+//     decimals: 18,
+//     name: 'Ether',
+//     symbol: 'ETH',
+//   },
+//   rpcUrls: {
+//     default: {
+//       http: ['https://rpc.fusaka-devnet-3.ethpandaops.io'],
+//     },
+//   },
+//   blockExplorers: {
+//     default: {
+//       name: 'Explorer',
+//       url: 'https://explorer.fusaka-devnet-3.ethpandaops.io',
+//     },
+//   },
+//   contracts: {},
+// });
+
 async function experimentWithBlob(sendTransaction: boolean = false) {
   // setup client
   const account = privateKeyToAccount(privateKey);
@@ -47,7 +69,7 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
     chain: sepolia,
     transport: http(),
   });
-  // setup clang kzg
+  // setup c kzg
   cKzg.loadTrustedSetup(0, mainnetTrustedSetupPath);
   // setup wasm kzg
   const wasmKzg = await loadKZG();
@@ -60,13 +82,13 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   const blob = blobs[0];
 
   /*
-   experiment 1: send blob transaction using clang kzg
+   experiment 1: send blob transaction using c kzg
   */
   let versionedHash = '0x' as Hex;
   let commitment = '0x' as Hex;
   let proof = '0x' as Hex;
   {
-    console.log('### experiment 1: Sending blob transaction using clang kzg');
+    console.log('### experiment 1: Send blob transaction using c kzg');
 
     commitment = bytesToHex(cKzg.blobToKzgCommitment(hexToBytes(blob as Hex)));
     proof = bytesToHex(
@@ -102,7 +124,7 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
         serializedTransaction: serializedTx,
       });
       console.log(
-        `transaction result: https://sepolia.blobscan.com/tx/${txHash}`
+        `transaction result: https://explorer.fusaka-devnet-3.ethpandaops.io//tx/${txHash}`
       );
       await timeout(5000); // wait for 5 seconds
       const transaction = await publicClient.getTransaction({
@@ -258,10 +280,12 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   }
 
   /*
-    experiment 6: check efficiency of clang kzg vs wasm kzg
+    experiment 6: check efficiency of proof generation with c kzg vs wasm kzg
   */
   {
-    console.log('### experiment 6: check efficiency of wasm kzg vs clang kzg');
+    console.log(
+      '### experiment 6: check efficiency of proof generation with c kzg vs wasm kzg'
+    );
     {
       const hrstart = process.hrtime();
       const _commitment = cKzg.blobToKzgCommitment(hexToBytes(blob as Hex));
@@ -276,7 +300,7 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
       if (!equalHex(bytesToHex(_proof), proof)) {
         throw new Error('Proof mismatch');
       }
-      console.log(`clang kzg took ${hrend[1] / 1000000} milliseconds`);
+      console.log(`c kzg took ${hrend[1] / 1000000} milliseconds`);
     }
 
     {
@@ -292,6 +316,37 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
       }
       console.log(`wasm kzg took ${hrend[1] / 1000000} milliseconds`);
     }
+
+    console.log();
+    console.log();
+  }
+
+  /*
+    experiment 7: verify cell kzg proof batch
+  */
+  {
+    console.log('### experiment 7: verify cell kzg proof batch');
+    const [_cells, _proofs] = cKzg.computeCellsAndKzgProofs(
+      hexToBytes(blob as Hex)
+    );
+    const indices = Array.from(
+      { length: cKzg.CELLS_PER_EXT_BLOB },
+      (_, i) => i
+    );
+    const dupCommitments = Array.from(
+      { length: cKzg.CELLS_PER_EXT_BLOB },
+      (_) => hexToBytes(commitment)
+    );
+    const isValid = cKzg.verifyCellKzgProofBatch(
+      dupCommitments,
+      indices,
+      _cells,
+      _proofs
+    );
+    if (!isValid) {
+      throw new Error('Proof verification failed');
+    }
+    console.log('proof verification succeeded');
   }
 }
 
