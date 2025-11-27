@@ -347,6 +347,45 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
       throw new Error('Proof verification failed');
     }
     console.log('proof verification succeeded');
+
+    console.log();
+    console.log();
+  }
+
+  /*
+    experiment 8: recover cells
+  */
+  {
+    console.log('### experiment 8: recover cells');
+    console.log('blob data size: ', hexToBytes(blob as Hex).length, 'bytes');
+    const [_cells, _proofs] = cKzg.computeCellsAndKzgProofs(
+      hexToBytes(blob as Hex)
+    );
+    console.log('cells number: ', _cells.length);
+    console.log(
+      'cells data size: ',
+      _cells.reduce((acc, curr) => acc + curr.length, 0),
+      'bytes'
+    );
+    const indices = Array.from(
+      { length: cKzg.CELLS_PER_EXT_BLOB },
+      (_, i) => i
+    );
+    console.log(
+      'cells data size to restore: ',
+      _cells.slice(64, 128).reduce((acc, curr) => acc + curr.length, 0),
+      'bytes'
+    );
+    const [recoveredCells, _recoveredProofs] = cKzg.recoverCellsAndKzgProofs(
+      indices.slice(64, 128),
+      _cells.slice(64, 128)
+    );
+    for (let i = 0; i < cKzg.CELLS_PER_EXT_BLOB; i++) {
+      if (!equalHex(bytesToHex(recoveredCells[i]), bytesToHex(_cells[i]))) {
+        throw new Error('Cell mismatch');
+      }
+    }
+    console.log('cells recovered successfully');
   }
 }
 
