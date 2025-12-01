@@ -18,6 +18,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
+import rootsOfUnity from './rootsOfUnity.json';
 
 dotenv.config({ quiet: true });
 
@@ -33,6 +34,7 @@ const privateKey = process.env.PRIVATE_KEY as Hex;
 const mainnetTrustedSetupPath = resolve(
   './node_modules/viem/trusted-setups/mainnet.json'
 );
+const rawBlob = `A purely peer-to-peer version of electronic cash would allow online payments to be sent directly from one party to another without going through a financial institution. Digital signatures provide part of the solution, but the main benefits are lost if a trusted third party is still required to prevent double-spending. We propose a solution to the double-spending problem using a peer-to-peer network. The network timestamps transactions by hashing them into an ongoing chain of hash-based proof-of-work, forming a record that cannot be changed without redoing the proof-of-work. The longest chain not only serves as proof of the sequence of events witnessed, but proof that it came from the largest pool of CPU power. As long as a majority of CPU power is controlled by nodes that are not cooperating to attack the network, they'll generate the longest chain and outpace attackers. The network itself requires minimal structure. Messages are broadcast on a best effort basis, and nodes can leave and rejoin the network at will, accepting the longest proof-of-work chain as proof of what happened while they were gone.`;
 
 // const fusakaDevnet = defineChain({
 //   id: 7023102237,
@@ -75,7 +77,7 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   const wasmKzg = await loadKZG();
   wasmKzg.loadTrustedSetup(0);
   // blob data
-  const blobs = toBlobs({ data: stringToHex('hello world') });
+  const blobs = toBlobs({ data: stringToHex(rawBlob) });
   if (blobs.length !== 1) {
     throw new Error('Only one blob is assumed in this example');
   }
@@ -216,7 +218,10 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   */
   {
     console.log('### experiment 4: verify kzg proof for a point off chain');
-    const zBytes = hexToBytes(blob as Hex).slice(0, 32);
+    const index = 3;
+    const zBytes = hexToBytes(`0x${rootsOfUnity[index]}`)
+      .reverse()
+      .slice(0, 32);
     const PointProof = cKzg.computeKzgProof(hexToBytes(blob as Hex), zBytes);
     const isValid = cKzg.verifyKzgProof(
       hexToBytes(commitment as Hex),
