@@ -181,20 +181,28 @@ async function experiment(sendTransaction: boolean = false) {
     const zBytes = hexToBytes(`0x${rootsOfUnity[index]}`)
       .reverse()
       .slice(0, 32);
-    const PointProof = cKzg.computeKzgProof(hexToBytes(blob as Hex), zBytes);
+    const pointProof = cKzg.computeKzgProof(hexToBytes(blob as Hex), zBytes);
+    const field = hexToBytes(blob as Hex).slice(
+      index * cKzg.BYTES_PER_FIELD_ELEMENT,
+      (index + 1) * cKzg.BYTES_PER_FIELD_ELEMENT
+    );
+    if (!equalHex(bytesToHex(field), bytesToHex(pointProof[1]))) {
+      throw new Error('field mismatch');
+    }
     const isValid = cKzg.verifyKzgProof(
       hexToBytes(commitment as Hex),
       zBytes,
-      PointProof[1],
-      PointProof[0]
+      pointProof[1],
+      pointProof[0]
     );
+    console.log(`${index}th field: ${bytesToHex(pointProof[1])}`);
     console.log(
       `arguments: ${JSON.stringify(
         {
           commitment,
           zBytes: bytesToHex(zBytes),
-          yBytes: bytesToHex(PointProof[1]),
-          proofBytes: bytesToHex(PointProof[0]),
+          yBytes: bytesToHex(pointProof[1]),
+          proofBytes: bytesToHex(pointProof[0]),
         },
         bigintReplacer,
         2
@@ -212,35 +220,40 @@ async function experiment(sendTransaction: boolean = false) {
     const zBytes = hexToBytes(`0x${rootsOfUnity[index]}`)
       .reverse()
       .slice(0, 32);
-    const PointProof = cKzg.computeKzgProof(hexToBytes(blob as Hex), zBytes);
+    const pointProof = cKzg.computeKzgProof(hexToBytes(blob as Hex), zBytes);
+    const field = hexToBytes(blob as Hex).slice(
+      index * cKzg.BYTES_PER_FIELD_ELEMENT,
+      (index + 1) * cKzg.BYTES_PER_FIELD_ELEMENT
+    );
+    if (!equalHex(bytesToHex(field), bytesToHex(pointProof[1]))) {
+      throw new Error('field mismatch');
+    }
     const result = await publicClient.call({
       to: POINT_EVALUATION_PRECOMPILE_ADDRESS,
       data: concat([
         versionedHash,
         bytesToHex(zBytes),
-        bytesToHex(PointProof[1]),
+        bytesToHex(pointProof[1]),
         commitment,
-        bytesToHex(PointProof[0]),
+        bytesToHex(pointProof[0]),
       ]),
     });
+    console.log(`${index}th field: ${bytesToHex(pointProof[1])}`);
     console.log(`address: ${POINT_EVALUATION_PRECOMPILE_ADDRESS}`);
     console.log(
       `arguments: ${JSON.stringify(
         {
           versionedHash,
           zBytes: bytesToHex(zBytes),
-          yBytes: bytesToHex(PointProof[1]),
+          yBytes: bytesToHex(pointProof[1]),
           commitment,
-          proofBytes: bytesToHex(PointProof[0]),
+          proofBytes: bytesToHex(pointProof[0]),
         },
         bigintReplacer,
         2
       )}`
     );
     console.log(`result: ${JSON.stringify(result, bigintReplacer, 2)}`);
-
-    console.log();
-    console.log();
   }
 
   /*
@@ -280,9 +293,6 @@ async function experiment(sendTransaction: boolean = false) {
       }
       console.log(`wasm kzg took ${hrend[1] / 1000000} milliseconds`);
     }
-
-    console.log();
-    console.log();
   }
 
   /*
@@ -311,9 +321,6 @@ async function experiment(sendTransaction: boolean = false) {
       throw new Error('Proof verification failed');
     }
     console.log('proof verification succeeded');
-
-    console.log();
-    console.log();
   }
 
   /*
