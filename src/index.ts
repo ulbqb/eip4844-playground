@@ -36,7 +36,7 @@ const mainnetTrustedSetupPath = resolve(
 );
 const rawBlob = `A purely peer-to-peer version of electronic cash would allow online payments to be sent directly from one party to another without going through a financial institution. Digital signatures provide part of the solution, but the main benefits are lost if a trusted third party is still required to prevent double-spending. We propose a solution to the double-spending problem using a peer-to-peer network. The network timestamps transactions by hashing them into an ongoing chain of hash-based proof-of-work, forming a record that cannot be changed without redoing the proof-of-work. The longest chain not only serves as proof of the sequence of events witnessed, but proof that it came from the largest pool of CPU power. As long as a majority of CPU power is controlled by nodes that are not cooperating to attack the network, they'll generate the longest chain and outpace attackers. The network itself requires minimal structure. Messages are broadcast on a best effort basis, and nodes can leave and rejoin the network at will, accepting the longest proof-of-work chain as proof of what happened while they were gone.`;
 
-async function experimentWithBlob(sendTransaction: boolean = false) {
+async function experiment(sendTransaction: boolean = false) {
   // setup client
   const account = privateKeyToAccount(privateKey);
   const client = createWalletClient({
@@ -60,23 +60,30 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
     throw new Error('Only one blob is assumed in this example');
   }
   const blob = blobs[0];
+  // commitment
+  const commitment = bytesToHex(
+    cKzg.blobToKzgCommitment(hexToBytes(blob as Hex))
+  );
+  // proof
+  const proof = bytesToHex(
+    cKzg.computeBlobKzgProof(
+      hexToBytes(blob as Hex),
+      hexToBytes(commitment as Hex)
+    )
+  );
+  // versioned hash
+  const versionedHash = (() => {
+    const versionedHashBytes = hexToBytes(sha256(commitment));
+    versionedHashBytes[0] = VERSIONED_HASH_VERSION_KZG[0];
+    return bytesToHex(versionedHashBytes);
+  })();
 
   /*
-   experiment 1: send blob transaction using c kzg
+    send blob transaction using c kzg
   */
-  let versionedHash = '0x' as Hex;
-  let commitment = '0x' as Hex;
-  let proof = '0x' as Hex;
-  {
-    console.log('### experiment 1: Send blob transaction using c kzg');
+  if (process.argv[2] === 'sendBlobTx') {
+    console.log('### Send blob transaction using c kzg');
 
-    commitment = bytesToHex(cKzg.blobToKzgCommitment(hexToBytes(blob as Hex)));
-    proof = bytesToHex(
-      cKzg.computeBlobKzgProof(
-        hexToBytes(blob as Hex),
-        hexToBytes(commitment as Hex)
-      )
-    );
     const request = await client.prepareTransactionRequest({
       account: account,
       blobs,
@@ -92,7 +99,6 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
         },
       ],
     });
-    versionedHash = request.blobVersionedHashes![0];
     const serializedTx = await account.signTransaction(request);
     console.log(
       `transaction: ${JSON.stringify(parseTransaction(serializedTx), bigintReplacer, 2)}`
@@ -121,36 +127,14 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
         'note: please set sendTransaction to true if you want to send the transaction'
       );
     }
-
-    console.log();
-    console.log();
   }
 
   /*
-    experiment 2: check how to calculate blob versioned hash
+    check efficiency of verification with proof vs without proof
   */
-  {
-    console.log('### experiment 2: check how to calculate blob versioned hash');
-
-    const commitment = cKzg.blobToKzgCommitment(hexToBytes(blob as Hex));
-    console.log(`commitment: ${bytesToHex(commitment)}`);
-    const _versionedHash = hexToBytes(sha256(commitment));
-    console.log(`sha256-hashed commitment: ${bytesToHex(_versionedHash)}`);
-    _versionedHash[0] = VERSIONED_HASH_VERSION_KZG[0];
-    console.log(`versioned hash: ${bytesToHex(_versionedHash)}`);
-    if (!equalHex(bytesToHex(_versionedHash), versionedHash)) {
-      throw new Error('versioned hash mismatch');
-    }
-    console.log();
-    console.log();
-  }
-
-  /*
-    experiment 3: check efficiency of verification with proof vs without proof
-  */
-  {
+  if (process.argv[2] === 'benchBlobKzgProofVerification') {
     console.log(
-      '### experiment 3: check efficiency of verification with proof vs without proof'
+      '### check efficiency of verification with proof vs without proof'
     );
     {
       const hrstart = process.hrtime();
@@ -186,16 +170,13 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
         `verification with proof took ${hrend[1] / 1000000} milliseconds`
       );
     }
-
-    console.log();
-    console.log();
   }
 
   /*
-    experiment 4: verify kzg proof for a point off chain
+    verify kzg proof for a point off chain
   */
-  {
-    console.log('### experiment 4: verify kzg proof for a point off chain');
+  if (process.argv[2] === 'verifyKzgSinglePointProofOffChain') {
+    console.log('### verify kzg proof for a point off chain');
     const index = 3;
     const zBytes = hexToBytes(`0x${rootsOfUnity[index]}`)
       .reverse()
@@ -220,16 +201,13 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
       )}`
     );
     console.log(`result: ${isValid}`);
-
-    console.log();
-    console.log();
   }
 
   /*
-    experiment 5: verify kzg proof for a point on chain
+    verify kzg proof for a point on chain
   */
-  {
-    console.log('### experiment 5: verify kzg proof for a point on chain');
+  if (process.argv[2] === 'verifyKzgSinglePointProofOnChain') {
+    console.log('### verify kzg proof for a point on chain');
     const index = 3;
     const zBytes = hexToBytes(`0x${rootsOfUnity[index]}`)
       .reverse()
@@ -266,11 +244,11 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   }
 
   /*
-    experiment 6: check efficiency of proof generation with c kzg vs wasm kzg
+    check efficiency of proof generation with c kzg vs wasm kzg
   */
-  {
+  if (process.argv[2] === 'benchBlobKzgProofGeneration') {
     console.log(
-      '### experiment 6: check efficiency of proof generation with c kzg vs wasm kzg'
+      '### check efficiency of proof generation with c kzg vs wasm kzg'
     );
     {
       const hrstart = process.hrtime();
@@ -308,10 +286,10 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   }
 
   /*
-    experiment 7: verify cell kzg proof batch
+    verify cell kzg proof batch
   */
-  {
-    console.log('### experiment 7: verify cell kzg proof batch');
+  if (process.argv[2] === 'verifyCellKzgProofBatch') {
+    console.log('### verify cell kzg proof batch');
     const [_cells, _proofs] = cKzg.computeCellsAndKzgProofs(
       hexToBytes(blob as Hex)
     );
@@ -339,10 +317,10 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   }
 
   /*
-    experiment 8: recover cells
+    recover cells
   */
-  {
-    console.log('### experiment 8: recover cells');
+  if (process.argv[2] === 'recoverCells') {
+    console.log('### recover cells');
     console.log('blob data size: ', hexToBytes(blob as Hex).length, 'bytes');
     const [_cells, _proofs] = cKzg.computeCellsAndKzgProofs(
       hexToBytes(blob as Hex)
@@ -375,7 +353,7 @@ async function experimentWithBlob(sendTransaction: boolean = false) {
   }
 }
 
-experimentWithBlob(true);
+experiment(true);
 
 function bigintReplacer(_key: string, value: any) {
   if (typeof value === 'bigint') {
