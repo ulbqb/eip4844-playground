@@ -36,7 +36,7 @@ const mainnetTrustedSetupPath = resolve(
 );
 const rawBlob = `A purely peer-to-peer version of electronic cash would allow online payments to be sent directly from one party to another without going through a financial institution. Digital signatures provide part of the solution, but the main benefits are lost if a trusted third party is still required to prevent double-spending. We propose a solution to the double-spending problem using a peer-to-peer network. The network timestamps transactions by hashing them into an ongoing chain of hash-based proof-of-work, forming a record that cannot be changed without redoing the proof-of-work. The longest chain not only serves as proof of the sequence of events witnessed, but proof that it came from the largest pool of CPU power. As long as a majority of CPU power is controlled by nodes that are not cooperating to attack the network, they'll generate the longest chain and outpace attackers. The network itself requires minimal structure. Messages are broadcast on a best effort basis, and nodes can leave and rejoin the network at will, accepting the longest proof-of-work chain as proof of what happened while they were gone.`;
 
-async function experiment(sendTransaction: boolean = false) {
+async function experiment() {
   // setup client
   const account = privateKeyToAccount(privateKey);
   const client = createWalletClient({
@@ -84,6 +84,11 @@ async function experiment(sendTransaction: boolean = false) {
   if (process.argv[2] === 'sendBlobTx') {
     console.log('### Send blob transaction using c kzg');
 
+    let sendTransaction = false;
+    if (process.argv.length > 3) {
+      sendTransaction = process.argv[3] === 'true';
+    }
+
     const request = await client.prepareTransactionRequest({
       account: account,
       blobs,
@@ -110,7 +115,7 @@ async function experiment(sendTransaction: boolean = false) {
         serializedTransaction: serializedTx,
       });
       console.log(
-        `transaction result: https://explorer.fusaka-devnet-3.ethpandaops.io//tx/${txHash}`
+        `transaction result: https://sepolia.etherscan.io/tx/${txHash}`
       );
       await timeout(5000); // wait for 5 seconds
       const transaction = await publicClient.getTransaction({
@@ -360,7 +365,7 @@ async function experiment(sendTransaction: boolean = false) {
   }
 }
 
-experiment(true);
+experiment();
 
 function bigintReplacer(_key: string, value: any) {
   if (typeof value === 'bigint') {
